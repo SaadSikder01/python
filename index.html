@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Python Playground</title>
+    
+    <!-- CodeMirror CSS & Monokai Theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/monokai.min.css">
+    
+    <!-- CodeMirror JS & Addons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+    
+    <!-- Skulpt JS -->
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/skulpt@1.2.0/dist/skulpt-stdlib.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #272822; /* Monokai background */
+            color: #f8f8f2;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .screen {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
+            min-width: 0; min-height: 0;
+        }
+        .hidden { display: none !important; }
+
+        /* === হেডার এবং মেনু স্টাইল === */
+        header {
+            background: #1e1e1e;
+            padding: 0 10px;
+            display: flex; align-items: center;
+            height: 45px;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+            position: relative;
+            z-index: 100;
+        }
+        
+        .hamburger {
+            display: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px 10px;
+            margin-right: 10px;
+            color: #ccc;
+        }
+        
+        .menu-bar {
+            display: flex; gap: 5px;
+            position: relative;
+        }
+        .menu-item {
+            cursor: pointer;
+            padding: 6px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            color: #ccc;
+            user-select: none;
+        }
+        .menu-item:hover, .menu-item.active { background: #333; color: #fff; }
+        
+        /* ড্রপডাউন মেনু (ডেস্কটপ) */
+        .dropdown {
+            position: absolute;
+            top: 35px; left: 0;
+            background: #252526;
+            border: 1px solid #454545;
+            display: none;
+            flex-direction: column;
+            min-width: 180px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-radius: 4px;
+            z-index: 200;
+        }
+        .dropdown.active { display: flex; }
+        .dropdown a {
+            padding: 8px 12px;
+            color: #ccc;
+            text-decoration: none;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+        }
+        .dropdown a:hover { background: #0e639c; color: white; }
+        .dropdown a span.shortcut { color: #888; font-size: 11px; }
+        
+        /* ফাইলের নাম */
+        .filename-container {
+            flex: 1;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 10px;
+        }
+        
+        /* রান বাটন */
+        .run-btn {
+            background: #28a745;
+            color: white; border: 0;
+            padding: 8px 16px; border-radius: 4px;
+            font-size: 13px; font-weight: bold;
+            cursor: pointer;
+            display: flex; align-items: center; gap: 5px;
+            transition: background 0.2s;
+        }
+        .run-btn:hover { background: #218838; }
+        .run-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* === এডিটর স্টাইল === */
+        #editor-panel {
+            flex: 1; min-height: 0; min-width: 0;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        .CodeMirror {
+            flex: 1; height: auto; min-height: 0; width: 100%;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 15px;
+            line-height: 1.5;
+            user-select: text; -webkit-user-select: text;
+        }
+        
+        /* === আউটপুট স্টাইল === */
+        #status { font-size: 13px; color: #4ec9b0; margin-right: auto; margin-left: 10px; }
+        .secondary {
+            background: #3a3d41; color: white; border: 0;
+            padding: 6px 12px; border-radius: 4px;
+            font-size: 12px; cursor: pointer; margin-left: 5px;
+        }
+        .secondary:hover { background: #4a4d51; }
+        
+        #console {
+            flex: 0 0 80px; height: 80px; min-height: 0;
+            padding: 8px 12px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font: 13px 'Consolas', monospace;
+            background: #000000;
+            border: none;
+            color: #d4d4d4;
+        }
+        .console-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px dashed #4ec9b0;
+            outline: none;
+            color: #ffffff;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            width: 60%;
+            padding: 0 5px;
+            margin: 0;
+            caret-color: #4ec9b0;
+        }
+
+        .error { color: #f48771; }
+        .info  { color: #4ec9b0; }
+        .muted { color: #858585; }
+        
+        /* টার্টল এরিয়া: কালো ব্যাকগ্রাউন্ড */
+        #turtle-wrap {
+            position: relative; flex: 1 1 0;
+            width: 100%; min-width: 0; min-height: 0;
+            overflow: hidden;
+            background: #000000;
+        }
+        #turtle {
+            position: absolute; inset: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #000000;
+        }
+        #turtle canvas { display: block; max-width: 100%; max-height: 100%; }
+        
+        /* =========================================
+           মোবাইলের জন্য ড্রয়ার (স্লাইডার) মেনু স্টাইল
+           ========================================= */
+        @media (max-width: 768px) {
+            .hamburger { display: block; }
+            
+            .menu-bar {
+                display: flex;
+                flex-direction: column;
+                position: fixed;
+                top: 45px; 
+                left: -260px; /* ডিফল্টভাবে লুকানো থাকবে */
+                width: 250px;
+                height: calc(100vh - 45px);
+                background: #1e1e1e;
+                border-right: 1px solid #333;
+                transition: left 0.3s ease; /* স্লাইড অ্যানিমেশন */
+                z-index: 999;
+                overflow-y: auto;
+                gap: 0;
+            }
+            
+            /* মেনু একটিভ হলে ডানে স্লাইড হবে */
+            .menu-bar.active { left: 0; }
+            
+            .menu-item { 
+                padding: 15px; 
+                border-bottom: 1px solid #333; 
+                border-radius: 0; 
+                width: 100%; 
+                font-size: 15px;
+            }
+            
+            /* মোবাইলে ড্রপডাউন স্ট্যাটিক হবে (Accordion এর মতো) */
+            .dropdown {
+                position: static;
+                display: none;
+                width: 100%;
+                border: none;
+                box-shadow: none;
+                background: #272822;
+            }
+            .dropdown.active { display: flex; }
+            .dropdown a { padding: 12px 20px 12px 30px; }
+            
+            .run-btn { padding: 6px 12px; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- ফাইল ওপেন করার জন্য হিডেন ইনপুট -->
+    <input type="file" id="file-input" accept=".py,.txt" style="display: none;">
+
+    <!-- === এডিটর স্ক্রিন === -->
+    <div id="editor-screen" class="screen">
+        <header>
+            <!-- হ্যামবার্গার আইকন (event পাঠানো হয়েছে যাতে বাবলিং বন্ধ হয়) -->
+            <div class="hamburger" onclick="toggleMobileMenu(event)">☰</div>
+            
+            <div class="menu-bar" id="menu-bar">
+                <!-- File Menu -->
+                <div class="menu-item" onclick="toggleDropdown(event, 'file-dropdown')">File</div>
+                <div class="dropdown" id="file-dropdown">
+                    <a onclick="actionWrapper('new')">New File <span class="shortcut">Ctrl+N</span></a>
+                    <a onclick="actionWrapper('open')">Open File... <span class="shortcut">Ctrl+O</span></a>
+                    <a onclick="actionWrapper('save')">Save / Download <span class="shortcut">Ctrl+S</span></a>
+                </div>
+
+                <!-- Edit Menu -->
+                <div class="menu-item" onclick="toggleDropdown(event, 'edit-dropdown')">Edit</div>
+                <div class="dropdown" id="edit-dropdown">
+                    <a onclick="actionWrapper('undo')">Undo <span class="shortcut">Ctrl+Z</span></a>
+                    <a onclick="actionWrapper('redo')">Redo <span class="shortcut">Ctrl+Y</span></a>
+                    <a onclick="actionWrapper('copy')">Copy <span class="shortcut">Ctrl+C</span></a>
+                    <a onclick="actionWrapper('cut')">Cut <span class="shortcut">Ctrl+X</span></a>
+                    <a onclick="actionWrapper('selectall')">Select All <span class="shortcut">Ctrl+A</span></a>
+                </div>
+
+                <!-- View Menu -->
+                <div class="menu-item" onclick="toggleDropdown(event, 'view-dropdown')">View</div>
+                <div class="dropdown" id="view-dropdown">
+                    <a onclick="actionWrapper('wordwrap')">Toggle Word Wrap</a>
+                </div>
+            </div>
+
+            <!-- ফাইলের নাম (মাঝখানে) -->
+            <div class="filename-container" id="filename-display">main.py</div>
+
+            <button id="run-btn" class="run-btn" onclick="runCode()">▶ Run</button>
+        </header>
+        
+        <div id="editor-panel">
+            <textarea id="code"></textarea>
+        </div>
+    </div>
+
+    <!-- === আউটপুট স্ক্রিন === -->
+    <div id="output-screen" class="screen hidden">
+        <header>
+            <h1 style="font-size: 15px; margin-right: 15px;">🐍 Output</h1>
+            <span id="status">Ready</span>
+            <button class="secondary" onclick="rerun()">↻ Re-run</button>
+            <button class="secondary" onclick="backToEditor()">✎ Back to Code</button>
+        </header>
+        <div id="console"></div>
+        <div id="turtle-wrap">
+            <div id="turtle"></div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // কাস্টম colorsys মডিউল 
+        // ==========================================
+        Sk.builtinFiles["files"]["src/lib/colorsys.py"] = `
+def hsv_to_rgb(h, s, v):
+    if s == 0.0: return (v, v, v)
+    i = int(h * 6.0)
+    f = h * 6.0 - i
+    p = v * (1.0 - s)
+    q = v * (1.0 - s * f)
+    t = v * (1.0 - s * (1.0 - f))
+    i = i % 6
+    if i == 0: return (v, t, p)
+    if i == 1: return (q, v, p)
+    if i == 2: return (p, v, t)
+    if i == 3: return (p, q, v)
+    if i == 4: return (t, p, v)
+    return (v, p, q)
+`;
+
+        // ==========================================
+        // এডিটর সেটআপ 
+        // ==========================================
+        const editor = CodeMirror.fromTextArea(
+            document.getElementById("code"),
+            {
+                mode: "python",
+                theme: "monokai",
+                lineNumbers: true,
+                indentUnit: 4,
+                tabSize: 4,
+                lineWrapping: true,
+                inputStyle: "contenteditable",
+                lineWiseCopyCut: false,
+                autoCloseBrackets: true, // ব্র্যাকেট ও কোটেশন অটো ক্লোজ
+                extraKeys: { 
+                    "Ctrl-Enter": runCode, 
+                    "Cmd-Enter": runCode
+                }
+            }
+        );
+
+        // ডিফল্ট কোড
+        editor.setValue(`import turtle
+import math
+import random
+
+# input() সরাসরি আউটপুট স্ক্রিনে কাজ করবে
+name = input("Enter your name: ")
+print("Hello,", name)
+
+# টার্টল গ্রাফিক্স
+screen = turtle.Screen()
+screen.bgcolor("black")
+
+t = turtle.Turtle()
+t.speed(0)
+t.width(2)
+
+colors = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
+
+for i in range(300):
+    t.pencolor(colors[i % len(colors)])
+    t.forward(i * 2)
+    t.left(59)
+
+t.hideturtle()
+print("Random:", random.randint(1, 100))
+`);
+
+        let currentFilename = "main.py";
+
+        // ==========================================
+        // মেনু ম্যানেজমেন্ট লজিক
+        // ==========================================
+        
+        // মোবাইলের স্লাইডার মেনু টগল
+        function toggleMobileMenu(event) {
+            event.stopPropagation(); // ক্লিক ইভেন্ট বাবলিং বন্ধ করা হলো
+            document.getElementById("menu-bar").classList.toggle("active");
+        }
+
+        // সাব-মেনু (File, Edit) টগল
+        function toggleDropdown(event, id) {
+            event.stopPropagation(); // প্যারেন্ট ইভেন্ট বন্ধ
+            
+            const dropdown = document.getElementById(id);
+            const isActive = dropdown.classList.contains("active");
+
+            // সব ড্রপডাউন বন্ধ করা
+            document.querySelectorAll('.dropdown').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            
+            // ক্লিক করা ড্রপডাউনটি টগল করা
+            if (!isActive) {
+                dropdown.classList.add("active");
+                event.target.classList.add("active");
+            }
+        }
+
+        // সব মেনু বন্ধ করার ফাংশন
+        function closeMenus() {
+            document.querySelectorAll('.dropdown').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+            document.getElementById("menu-bar").classList.remove("active");
+        }
+
+        // গ্লোবাল ক্লিক - মেনুর বাইরে ক্লিক করলে সব বন্ধ হবে
+        document.addEventListener("click", (e) => {
+            // যদি ক্লিক মেনুর ভেতরে না হয়, তবেই বন্ধ হবে
+            if (!e.target.closest('.menu-bar') && !e.target.closest('.hamburger')) {
+                closeMenus();
+            }
+        });
+
+        // মেনু আইটেম অ্যাকশন র‍্যাপার (যাতে ক্লিক করলে মেনু বন্ধ হয়ে যায়)
+        function actionWrapper(action) {
+            if (action === 'new') newFile();
+            else if (action === 'open') triggerOpenFile();
+            else if (action === 'save') saveFile();
+            else if (action === 'undo') editor.undo();
+            else if (action === 'redo') editor.redo();
+            else if (action === 'copy') copySelection();
+            else if (action === 'cut') cutSelection();
+            else if (action === 'selectall') editor.execCommand('selectAll');
+            else if (action === 'wordwrap') editor.setOption('lineWrapping', !editor.getOption('lineWrapping'));
+            
+            closeMenus(); // অ্যাকশন শেষে মেনু বন্ধ
+        }
+
+        // ==========================================
+        // ফাইল ওপেন ও সেভ লজিক
+        // ==========================================
+        
+        function triggerOpenFile() {
+            document.getElementById("file-input").click();
+        }
+
+        document.getElementById("file-input").addEventListener("change", function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                editor.setValue(event.target.result);
+                currentFilename = file.name;
+                document.getElementById("filename-display").textContent = currentFilename;
+                toast("Opened: " + currentFilename);
+            };
+            reader.readAsText(file);
+            this.value = ''; // রিসেট
+        });
+
+        function newFile() {
+            if(confirm("আপনি কি নতুন ফাইল শুরু করতে চান? সেভ না করা কোড মুছে যাবে।")) {
+                editor.setValue("");
+                currentFilename = "main.py";
+                document.getElementById("filename-display").textContent = currentFilename;
+                toast("New file created");
+            }
+        }
+
+        function saveFile() {
+            const code = editor.getValue();
+            const blob = new Blob([code], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentFilename;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast("Saved as " + currentFilename);
+        }
+
+        // কিবোর্ড শর্টকাট
+        document.addEventListener("keydown", function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'o') { e.preventDefault(); triggerOpenFile(); }
+                if (e.key === 's') { e.preventDefault(); saveFile(); }
+                if (e.key === 'n') { e.preventDefault(); newFile(); }
+            }
+        });
+
+        // ==========================================
+        // অন্যান্য হেল্পার ফাংশন
+        // ==========================================
+        function outf(text) {
+            const c = document.getElementById("console");
+            c.appendChild(document.createTextNode(text));
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function builtinRead(path) {
+            if (!Sk.builtinFiles || Sk.builtinFiles["files"][path] === undefined) {
+                throw new Error("File not found: " + path);
+            }
+            return Sk.builtinFiles["files"][path];
+        }
+
+        // ইনলাইন ইনপুট (পপআপ ছাড়া)
+        function inlineInput(promptText) {
+            return new Promise((resolve) => {
+                const consoleDiv = document.getElementById("console");
+                if (promptText) consoleDiv.appendChild(document.createTextNode(promptText));
+                
+                const inputEl = document.createElement("input");
+                inputEl.type = "text";
+                inputEl.className = "console-input";
+                inputEl.autocomplete = "off";
+                inputEl.autocorrect = "off";
+                inputEl.autocapitalize = "off";
+                inputEl.spellcheck = false;
+                
+                consoleDiv.appendChild(inputEl);
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                setTimeout(() => inputEl.focus(), 50);
+                
+                inputEl.addEventListener("keydown", function(e) {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        const val = inputEl.value;
+                        inputEl.remove();
+                        consoleDiv.appendChild(document.createTextNode(val + "\n"));
+                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                        resolve(val);
+                    }
+                });
+            });
+        }
+
+        function logLine(message, cls) {
+            const d = document.createElement("div");
+            if (cls) d.className = cls;
+            d.textContent = message;
+            const c = document.getElementById("console");
+            c.appendChild(d);
+            c.scrollTop = c.scrollHeight;
+        }
+
+        let toastTimer;
+        function toast(message) {
+            let el = document.getElementById("toast");
+            if (!el) {
+                el = document.createElement("div");
+                el.id = "toast";
+                el.style.cssText = "position:fixed; z-index:9999; top:50px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:8px 14px; border-radius:5px; font-size:13px; opacity:0; pointer-events:none; transition:opacity 0.2s;";
+                document.body.appendChild(el);
+            }
+            el.textContent = message;
+            el.style.opacity = "1";
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.style.opacity = "0", 2000);
+        }
+
+        async function copySelection() {
+            const selected = editor.getSelection();
+            if (!selected) { toast("আগে কোড সিলেক্ট করুন"); return; }
+            try {
+                await navigator.clipboard.writeText(selected);
+                toast("কপি হয়েছে");
+            } catch (e) {
+                toast("কপি ব্যর্থ: ব্রাউজার সিকিউরিটি");
+            }
+        }
+
+        async function cutSelection() {
+            const selected = editor.getSelection();
+            if (!selected) { toast("আগে কোড সিলেক্ট করুন"); return; }
+            try {
+                await navigator.clipboard.writeText(selected);
+                editor.replaceSelection("");
+                editor.focus();
+                toast("কাট হয়েছে");
+            } catch (e) {
+                toast("কাট ব্যর্থ: ব্রাউজার সিকিউরিটি");
+            }
+        }
+
+        // ==========================================
+        // কোড রান করার লজিক
+        // ==========================================
+        let running = false;
+        let lastCode = "";
+
+        function nextFrame() {
+            return new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        async function runCode() {
+            if (running) return;
+            lastCode = editor.getValue();
+            document.getElementById("editor-screen").classList.add("hidden");
+            document.getElementById("output-screen").classList.remove("hidden");
+            await nextFrame();
+            await nextFrame();
+            await execute(lastCode);
+        }
+
+        async function rerun() {
+            if (running || !lastCode) return;
+            await execute(lastCode);
+        }
+
+        function backToEditor() {
+            if (running) {
+                toast("কোড চলা শেষ হওয়া পর্যন্ত অপেক্ষা করুন");
+                return;
+            }
+            document.getElementById("output-screen").classList.add("hidden");
+            document.getElementById("editor-screen").classList.remove("hidden");
+            editor.refresh();
+        }
+
+        async function execute(code) {
+            if (running) return;
+            running = true;
+            if (document.activeElement) document.activeElement.blur();
+
+            const runButton = document.getElementById("run-btn");
+            const consoleDiv = document.getElementById("console");
+            const status = document.getElementById("status");
+            const wrap = document.getElementById("turtle-wrap");
+
+            runButton.disabled = true;
+            consoleDiv.textContent = "";
+            consoleDiv.style.flex = "0 0 80px";
+            consoleDiv.style.height = "80px";
+            wrap.classList.remove("hidden");
+            status.textContent = "Running...";
+            status.style.color = "#f5c518";
+
+            const old = document.getElementById("turtle");
+            const fresh = document.createElement("div");
+            fresh.id = "turtle";
+            old.replaceWith(fresh);
+            await nextFrame();
+
+            const width = Math.max(1, Math.floor(wrap.clientWidth));
+            const height = Math.max(1, Math.floor(wrap.clientHeight));
+
+            Sk.TurtleGraphics = { target: "turtle", width: width, height: height };
+
+            Sk.configure({
+                output: outf,
+                read: builtinRead,
+                __future__: Sk.python3,
+                execLimit: 30000,
+                inputfun: inlineInput,
+                inputfunTakesPrompt: true
+            });
+
+            try {
+                await Sk.misceval.asyncToPromise(() =>
+                    Sk.importMainWithBody("<stdin>", false, code, true)
+                );
+
+                const canvas = document.querySelector("#turtle canvas");
+                if (!canvas) {
+                    wrap.classList.add("hidden");
+                    consoleDiv.style.flex = "1 1 auto";
+                    consoleDiv.style.height = "auto";
+                    if (!consoleDiv.textContent.trim()) {
+                        logLine("কোড সফলভাবে চলেছে, তবে কোনো গ্রাফিক্স বা আউটপুট নেই।", "muted");
+                    }
+                } else {
+                    canvas.style.display = "block";
+                    canvas.style.maxWidth = "100%";
+                    canvas.style.maxHeight = "100%";
+                    logLine("Canvas: " + canvas.width + " × " + canvas.height, "info");
+                }
+
+                status.textContent = "Done ✓";
+                status.style.color = "#4ec9b0";
+            } catch (error) {
+                logLine("Error: " + String(error), "error");
+                status.textContent = "Error ✗";
+                status.style.color = "#f48771";
+            } finally {
+                running = false;
+                runButton.disabled = false;
+            }
+        }
+
+        window.addEventListener("load", () => {
+            setTimeout(() => editor.refresh(), 200);
+        });
+    </script>
+</body>
+</html>
